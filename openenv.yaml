@@ -1,0 +1,8 @@
+name: incident_env
+
+entrypoint: app.py
+
+tasks:
+  - easy
+  - medium
+  - hard
