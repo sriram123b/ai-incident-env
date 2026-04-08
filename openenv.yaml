@@ -1,13 +1,9 @@
 name: incident-response-env
-description: >
-  A real-world incident response simulation environment where agents
-  investigate and resolve infrastructure issues such as server failures,
-  security breaches, and database outages.
+description: Incident response simulation environment
 
 version: "1.0"
 
 entrypoint: app:app
-
 protocol: http
 
 endpoints:
@@ -42,17 +38,17 @@ models:
 
 tasks:
   - name: easy_resolution
-    description: Successfully resolve the incident
+    description: Resolve the incident
     success_condition:
       status: resolved
 
   - name: efficient_resolution
-    description: Resolve the incident in minimal steps
+    description: Resolve in minimal steps
     success_condition:
       max_steps: 3
 
   - name: correct_sequence
-    description: Follow correct sequence (investigate before resolve)
+    description: Investigate before resolving
     success_condition:
       logs_must_include:
         - Investigating
