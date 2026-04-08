@@ -43,9 +43,17 @@ models:
 tasks:
   - name: easy_resolution
     description: Successfully resolve the incident
+    success_condition:
+      status: resolved
 
   - name: efficient_resolution
     description: Resolve the incident in minimal steps
+    success_condition:
+      max_steps: 3
 
   - name: correct_sequence
     description: Follow correct sequence (investigate before resolve)
+    success_condition:
+      logs_must_include:
+        - Investigating
+        - Resolved
