@@ -16,20 +16,56 @@ app.add_middleware(
 )
 
 # ---------------- STATE MODEL ----------------
+#ENV STATE
 class EnvState(BaseModel):
     status: str
     logs: list
     score: int
     step_count: int
+    incident_type: str
 
 # Initial state
 state = EnvState(
     status="idle",
     logs=[],
     score=0,
-    step_count=0
+    step_count=0,
+    incident_type="none"
 )
 
+@app.get("/state")
+def get_state():
+    return {
+        "state": state,
+        "evaluation": evaluate_tasks(state)
+    }
+
+#-----------------GRADER FUNCTION-------------------
+def evaluate_tasks(state):
+    results = []
+
+    # Task 1: Basic Investigation
+    results.append({
+        "task": "basic_investigation",
+        "passed": state.status == "resolved" and state.score >= 20
+    })
+
+    # Task 2: Efficient Resolution
+    results.append({
+        "task": "efficient_resolution",
+        "passed": state.status == "resolved" and state.step_count <= 3
+    })
+
+    # Task 3: Correct Sequence
+    results.append({
+        "task": "correct_sequence",
+        "passed": (
+            "Investigation started" in state.logs and
+            "Incident resolved successfully" in state.logs
+        )
+    })
+
+    return results
 # ---------------- CORE API (OPENENV STYLE) ----------------
 
 @app.get("/")
@@ -40,38 +76,57 @@ def root():
 @app.post("/reset")
 def reset():
     global state
+
+    incident = random.choice([
+        "server_down",
+        "security_breach",
+        "database_failure"
+    ])
+
     state = EnvState(
         status="reset",
-        logs=["System reset triggered"],
+        logs=[f"New incident: {incident}"],
         score=0,
-        step_count=0
+        step_count=0,
+        incident_type=incident
     )
+
     return state
 
 # STEP (IMPORTANT FOR HACKATHON)
-class Action(BaseModel):
-    action: str
-
 @app.post("/step")
 def step(action: Action):
     global state
-
     state.step_count += 1
 
-    # Simple logic
+    # INVESTIGATE
     if action.action == "investigate":
         state.status = "investigating"
-        state.logs.append("Investigation started")
+        state.logs.append(f"Investigating {state.incident_type}")
         state.score += 10
 
+    # RESOLVE (depends on incident)
     elif action.action == "resolve":
-        if state.status == "investigating":
-            state.status = "resolved"
-            state.logs.append("Incident resolved successfully")
-            state.score += 20
-        else:
+
+        if state.status != "investigating":
             state.logs.append("Resolve failed: investigate first")
             state.score -= 5
+
+        else:
+            if state.incident_type == "server_down":
+                state.logs.append("Restarted server successfully")
+                state.status = "resolved"
+                state.score += 20
+
+            elif state.incident_type == "security_breach":
+                state.logs.append("Applied security patch")
+                state.status = "resolved"
+                state.score += 25
+
+            elif state.incident_type == "database_failure":
+                state.logs.append("Recovered database")
+                state.status = "resolved"
+                state.score += 20
 
     else:
         state.logs.append(f"Unknown action: {action.action}")
@@ -79,10 +134,8 @@ def step(action: Action):
 
     return state
 
-# STATE
-@app.get("/state")
-def get_state():
-    return state
+
+
 
 # ---------------- FRONTEND UI ----------------
 
@@ -106,42 +159,63 @@ def ui():
 
             <h3>System State</h3>
 
-            <pre id="output" style="
-                background:white;
-                padding:20px;
-                display:inline-block;
-                text-align:left;
-                border-radius:10px;
-                box-shadow:0 2px 10px rgba(0,0,0,0.1);
-                min-width:350px;
-            ">Click a button to start</pre>
+            <div id="output" style="
+    background:white;
+    padding:20px;
+    display:inline-block;
+    text-align:left;
+    border-radius:12px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.1);
+    min-width:350px;
+    font-size:14px;
+"></div>
 
             <script>
-                async function sendAction(action) {
+    async function sendAction(action) {
 
-                    if(action === "reset"){
-                        let res = await fetch('/reset', {method:'POST'});
-                        let data = await res.json();
-                        update(data);
-                        return;
-                    }
+        if(action === "reset"){
+            await fetch('/reset', {method:'POST'});
+            update();
+            return;
+        }
 
-                    let res = await fetch('/step', {
-                        method:'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({action: action})
-                    });
+        await fetch('/step', {
+            method:'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({action: action})
+        });
 
-                    let data = await res.json();
-                    update(data);
-                }
+        update();
+    }
+ 
+   async function update(){
+    let res = await fetch('/state');
+    let data = await res.json();
 
-                function update(data){
-                    document.getElementById('output').innerText =
-                        JSON.stringify(data, null, 2);
-                }
-            </script>
+    let state = data.state;
+    let evals = data.evaluation;
+
+    let html = `
+    <b>Incident:</b> ${state.incident_type} <br>
+    <b>Status:</b> ${state.status} <br>
+    <b>Score:</b> ${state.score} <br>
+    <b>Steps:</b> ${state.step_count} <br><br>
+
+        <b>Logs:</b><br>
+        ${state.logs.map(l => "• " + l).join("<br>")}<br><br>
+
+        <b>Evaluation:</b><br>
+        ${evals.map(e => 
+            (e.passed ? "✅" : "❌") + " " + e.task
+        ).join("<br>")}
+    `;
+
+    document.getElementById('output').innerHTML = html;
+}
+</script>
 
         </body>
     </html>
     """
+
+
