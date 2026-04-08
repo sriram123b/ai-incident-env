@@ -146,3 +146,47 @@ def get_state():
         },
         "evaluation": evaluate_tasks()
     }
+
+
+##----------UI------------------
+
+from fastapi.responses import HTMLResponse
+
+@app.get("/ui", response_class=HTMLResponse)
+def ui():
+    return """
+    <html>
+    <body style="font-family:Arial;text-align:center;margin-top:40px;">
+        <h2>Incident Environment</h2>
+
+        <button onclick="act('investigate')">Investigate</button>
+        <button onclick="act('resolve')">Resolve</button>
+        <button onclick="reset()">Reset</button>
+
+        <pre id="out"></pre>
+
+        <script>
+        async function reset(){
+            await fetch('/reset',{method:'POST'});
+            update();
+        }
+
+        async function act(a){
+            await fetch('/step',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({action:a})
+            });
+            update();
+        }
+
+        async function update(){
+            let r = await fetch('/state');
+            let d = await r.json();
+            document.getElementById('out').innerText =
+                JSON.stringify(d,null,2);
+        }
+        </script>
+    </body>
+    </html>
+    """
