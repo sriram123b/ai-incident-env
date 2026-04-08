@@ -1,80 +1,72 @@
-import requests
 import os
-import time
+import requests
 
-# ---------------- CONFIG ----------------
-
-BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 MODEL_NAME = os.getenv("MODEL_NAME", "baseline-agent")
+HF_TOKEN = os.getenv("HF_TOKEN", "dummy")
 
-MAX_STEPS = 5
-
-# ---------------- LOG HELPERS ----------------
+TASK_NAME = "incident_response"
+BENCHMARK = "incident_env"
 
 def log_start():
-    print(f"[START] env=incident-response model={MODEL_NAME}", flush=True)
+    print(f"[START] task={TASK_NAME} env={BENCHMARK} model={MODEL_NAME}", flush=True)
 
-def log_step(step, action, reward, done):
+def log_step(step, action, reward, done, error=None):
+    error_val = error if error else "null"
     print(
-        f"[STEP] step={step} action={action} reward={reward:.2f} done={done}",
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error_val}",
         flush=True
     )
 
-def log_end(success, steps, score):
+def log_end(success, steps, score, rewards):
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
     print(
-        f"[END] success={success} steps={steps} score={score:.2f}",
+        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
         flush=True
     )
-
-# ---------------- BASELINE POLICY ----------------
-
-def choose_action(step):
-    # simple deterministic policy
-    if step == 1:
-        return "investigate"
-    return "resolve"
-
-# ---------------- MAIN ----------------
 
 def main():
+    rewards = []
+    steps = 0
+    success = False
+    score = 0.0
+
     log_start()
 
-    # RESET ENV
-    requests.post(f"{BASE_URL}/reset")
+    try:
+        # RESET
+        res = requests.post(f"{API_BASE_URL}/reset")
+        obs = res.json()["observation"]
 
-    total_reward = 0.0
-    steps_taken = 0
-    success = False
+        actions = ["investigate", "resolve"]
 
-    for step in range(1, MAX_STEPS + 1):
+        for i, action in enumerate(actions, start=1):
+            res = requests.post(f"{API_BASE_URL}/step", json={"action": action})
+            data = res.json()
 
-        action = choose_action(step)
+            reward = data.get("reward", 0.0)
+            done = data.get("done", False)
 
-        res = requests.post(
-            f"{BASE_URL}/step",
-            json={"action": action}
-        )
+            rewards.append(reward)
+            steps = i
 
-        data = res.json()
+            log_step(i, action, reward, done)
 
-        reward = data.get("reward", 0.0)
-        done = data.get("done", False)
+            if done:
+                break
 
-        total_reward += reward
-        steps_taken = step
+        # FINAL STATE
+        state = requests.get(f"{API_BASE_URL}/state").json()
+        score = state["evaluation"][0]["score"]
 
-        log_step(step, action, reward, done)
+        success = score >= 1.0
 
-        if done:
-            success = True
-            break
+    except Exception as e:
+        log_step(steps, "error", 0.0, True, str(e))
+        success = False
 
-        time.sleep(0.2)  # slight delay (safe)
-
-    # Normalize score to 0–1
-    score = max(0.0, min(1.0, total_reward))
-
-    log_end(success, steps_taken, score)
+    finally:
+        log_end(success, steps, score, rewards)
 
 
 if __name__ == "__main__":

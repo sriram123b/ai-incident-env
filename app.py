@@ -52,11 +52,13 @@ INCIDENTS = [
 def evaluate_tasks(state):
     results = []
 
+    # Task 1: Easy - just resolve
     results.append({
         "task": "easy_resolution",
         "score": 1.0 if state["status"] == "resolved" else 0.0
     })
 
+    # Task 2: Medium - efficient resolution
     if state["status"] == "resolved":
         if state["step_count"] <= 3:
             score = 1.0
@@ -72,11 +74,12 @@ def evaluate_tasks(state):
         "score": score
     })
 
+    # Task 3: Hard - correct sequence
     results.append({
         "task": "correct_sequence",
         "score": 1.0 if (
             any("Investigating" in log for log in state["logs"]) and
-            any("Resolved" in log for log in state["logs"])
+            any("Resolved" in log or "resolved" in log for log in state["logs"])
         ) else 0.0
     })
 
@@ -89,7 +92,6 @@ def root():
     return {"message": "Incident Environment Running"}
 
 # ---------------- RESET ----------------
-
 @app.post("/reset")
 def reset():
     global state
@@ -103,7 +105,10 @@ def reset():
         "incident_type": incident
     }
 
-    return {"observation": state}
+    return {
+        "observation": state
+    }
+
 
 # ---------------- STEP ----------------
 
@@ -111,37 +116,35 @@ def reset():
 def step(action: Action):
     global state
 
-    reward = 0.0
-    done = False
-
     state["step_count"] += 1
+    reward = 0
 
     if action.action == "investigate":
         state["status"] = "investigating"
-        state["logs"].append(f"🔍 Investigating {state['incident_type']}")
+        state["logs"].append(f"Investigating {state['incident_type']}")
         reward = 0.3
 
     elif action.action == "resolve":
-        if state["status"] == "investigating":
-            state["status"] = "resolved"
-            state["logs"].append(f"✅ Resolved {state['incident_type']}")
-            reward = 0.7
-            done = True
-        else:
-            state["logs"].append("⚠️ Resolve failed: investigate first")
+        if state["status"] != "investigating":
+            state["logs"].append("Resolve failed: investigate first")
             reward = -0.2
+        else:
+            state["status"] = "resolved"
+            state["logs"].append("Resolved successfully")
+            reward = 0.7
 
     else:
-        state["logs"].append(f"❌ Invalid action: {action.action}")
+        state["logs"].append(f"Unknown action: {action.action}")
         reward = -0.1
+
+    done = state["status"] == "resolved"
 
     return {
         "observation": state,
         "reward": reward,
         "done": done,
-        "info": {"tasks": evaluate_tasks(state)}
+        "info": {}
     }
-
 # ---------------- STATE ----------------
 
 @app.get("/state")
