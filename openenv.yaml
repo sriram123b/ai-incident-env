@@ -1,8 +1,33 @@
-name: incident_env
+name: incident-env
+description: Incident response simulation environment
 
 entrypoint: app.py
 
+endpoints:
+  reset: /reset
+  step: /step
+  state: /state
+
+actions:
+  - investigate
+  - resolve
+
 tasks:
-  - easy
-  - medium
-  - hard
+  - name: basic_investigation
+    description: Perform investigation before resolving
+    success_condition:
+      status: resolved
+      min_score: 20
+
+  - name: efficient_resolution
+    description: Resolve incident with minimum steps
+    success_condition:
+      status: resolved
+      max_steps: 3
+
+  - name: correct_sequence
+    description: Follow correct sequence of actions
+    success_condition:
+      logs_must_include:
+        - Investigation started
+        - Incident resolved successfully
