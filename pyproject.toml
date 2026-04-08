@@ -1,8 +1,8 @@
-[AI-INCIDENT-ENVIRONMENT]
+[project]
 name = "incident-env"
 version = "0.1.0"
 description = "Incident response OpenEnv environment"
-authors = [{name = "Sriram"},{name = "Vishala"}]
+authors = [{name = "Sriram"}, {name = "Vishala"}]
 dependencies = [
     "fastapi",
     "uvicorn",
