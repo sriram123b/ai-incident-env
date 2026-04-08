@@ -47,6 +47,42 @@ INCIDENTS = [
     "security_breach"
 ]
 
+@app.post("/autoplay")
+def autoplay():
+    global state
+
+    # Reset environment
+    reset()
+
+    trajectory = []
+    rewards = []
+
+    actions = ["investigate", "resolve"]
+
+    for step_id, action in enumerate(actions, start=1):
+        result = step(Action(action=action))
+
+        trajectory.append({
+            "step": step_id,
+            "action": action,
+            "reward": result["reward"],
+            "done": result["done"]
+        })
+
+        rewards.append(result["reward"])
+
+        if result["done"]:
+            break
+
+    evaluation = evaluate_tasks(state)
+
+    return {
+        "trajectory": trajectory,
+        "final_state": state,
+        "evaluation": evaluation,
+        "total_reward": sum(rewards)
+    }
+
 # ---------------- GRADER ----------------
 
 def evaluate_tasks(state):
