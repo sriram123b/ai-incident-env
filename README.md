@@ -94,3 +94,8 @@ Score: 1.0 or 0.0
 ```bash
 pip install fastapi uvicorn requests
 uvicorn app:app --reload
+
+
+## 🧪 Run Inference
+
+python inference.py
