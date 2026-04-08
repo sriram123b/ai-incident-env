@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import random
 
@@ -15,58 +14,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------- STATE MODEL ----------------
-#ENV STATE
-class EnvState(BaseModel):
+# ---------------- MODELS ----------------
+
+class Observation(BaseModel):
     status: str
     logs: list
-    score: int
     step_count: int
     incident_type: str
 
-# Initial state
-state = EnvState(
-    status="idle",
-    logs=[],
-    score=0,
-    step_count=0,
-    incident_type="none"
-)
+class Action(BaseModel):
+    action: str
 
-@app.get("/state")
-def get_state():
-    return {
-        "state": state,
-        "evaluation": evaluate_tasks(state)
-    }
+class StepResult(BaseModel):
+    observation: Observation
+    reward: float
+    done: bool
+    info: dict
 
-#-----------------GRADER FUNCTION-------------------
-def evaluate_tasks(state):
-    results = []
+# ---------------- STATE ----------------
 
-    # Task 1: Basic Investigation
-    results.append({
-        "task": "basic_investigation",
-        "passed": state.status == "resolved" and state.score >= 20
-    })
+class EnvState:
+    def __init__(self):
+        self.status = "idle"
+        self.logs = []
+        self.step_count = 0
+        self.incident_type = "none"
 
-    # Task 2: Efficient Resolution
-    results.append({
-        "task": "efficient_resolution",
-        "passed": state.status == "resolved" and state.step_count <= 3
-    })
+state = EnvState()
 
-    # Task 3: Correct Sequence
-    results.append({
-        "task": "correct_sequence",
-        "passed": (
-            "Investigation started" in state.logs and
-            "Incident resolved successfully" in state.logs
-        )
-    })
+# ---------------- GRADER ----------------
 
-    return results
-# ---------------- CORE API (OPENENV STYLE) ----------------
+def evaluate_tasks():
+    return [
+        {
+            "task": "easy_resolution",
+            "score": 1.0 if state.status == "resolved" else 0.0
+        },
+        {
+            "task": "efficient_resolution",
+            "score": 1.0 if state.step_count <= 3 else 0.5 if state.step_count <= 5 else 0.0
+        },
+        {
+            "task": "correct_sequence",
+            "score": 1.0 if (
+                any("Investigating" in log for log in state.logs) and
+                state.status == "resolved"
+            ) else 0.0
+        }
+    ]
+
+# ---------------- CORE API ----------------
 
 @app.get("/")
 def root():
@@ -83,139 +80,69 @@ def reset():
         "database_failure"
     ])
 
-    state = EnvState(
-        status="reset",
-        logs=[f"New incident: {incident}"],
-        score=0,
-        step_count=0,
-        incident_type=incident
-    )
+    state = EnvState()
+    state.status = "reset"
+    state.logs = [f"New incident: {incident}"]
+    state.incident_type = incident
 
-    return state
+    return {
+        "observation": Observation(
+            status=state.status,
+            logs=state.logs,
+            step_count=state.step_count,
+            incident_type=state.incident_type
+        )
+    }
 
-# STEP (IMPORTANT FOR HACKATHON)
-@app.post("/step")
+# STEP
+@app.post("/step", response_model=StepResult)
 def step(action: Action):
     global state
-    state.step_count += 1
 
-    # INVESTIGATE
+    state.step_count += 1
+    reward = 0.0
+    done = False
+
     if action.action == "investigate":
         state.status = "investigating"
         state.logs.append(f"Investigating {state.incident_type}")
-        state.score += 10
+        reward = 0.3
 
-    # RESOLVE (depends on incident)
     elif action.action == "resolve":
-
         if state.status != "investigating":
             state.logs.append("Resolve failed: investigate first")
-            state.score -= 5
-
+            reward = -0.2
         else:
-            if state.incident_type == "server_down":
-                state.logs.append("Restarted server successfully")
-                state.status = "resolved"
-                state.score += 20
-
-            elif state.incident_type == "security_breach":
-                state.logs.append("Applied security patch")
-                state.status = "resolved"
-                state.score += 25
-
-            elif state.incident_type == "database_failure":
-                state.logs.append("Recovered database")
-                state.status = "resolved"
-                state.score += 20
+            state.status = "resolved"
+            state.logs.append("Incident resolved successfully")
+            reward = 0.7
+            done = True
 
     else:
         state.logs.append(f"Unknown action: {action.action}")
-        state.score -= 1
+        reward = -0.1
 
-    return state
+    return StepResult(
+        observation=Observation(
+            status=state.status,
+            logs=state.logs,
+            step_count=state.step_count,
+            incident_type=state.incident_type
+        ),
+        reward=reward,
+        done=done,
+        info={"tasks": evaluate_tasks()}
+    )
 
-
-
-
-# ---------------- FRONTEND UI ----------------
-
-@app.get("/ui", response_class=HTMLResponse)
-def ui():
-    return """
-    <html>
-        <head>
-            <title>Incident Environment</title>
-        </head>
-
-        <body style="font-family: Arial; text-align:center; margin-top:40px; background:#f5f7fa;">
-
-            <h1 style="color:#333;">🚨 Incident Environment Dashboard</h1>
-
-            <div style="margin:20px;">
-                <button onclick="sendAction('reset')" style="padding:10px 20px; margin:5px;">Reset</button>
-                <button onclick="sendAction('investigate')" style="padding:10px 20px; margin:5px;">Investigate</button>
-                <button onclick="sendAction('resolve')" style="padding:10px 20px; margin:5px;">Resolve</button>
-            </div>
-
-            <h3>System State</h3>
-
-            <div id="output" style="
-    background:white;
-    padding:20px;
-    display:inline-block;
-    text-align:left;
-    border-radius:12px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.1);
-    min-width:350px;
-    font-size:14px;
-"></div>
-
-            <script>
-    async function sendAction(action) {
-
-        if(action === "reset"){
-            await fetch('/reset', {method:'POST'});
-            update();
-            return;
-        }
-
-        await fetch('/step', {
-            method:'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({action: action})
-        });
-
-        update();
+# STATE
+@app.get("/state")
+def get_state():
+    return {
+        "state": {
+            "status": state.status,
+            "logs": state.logs,
+            "step_count": state.step_count,
+            "incident_type": state.incident_type
+        },
+        "evaluation": evaluate_tasks()
     }
- 
-   async function update(){
-    let res = await fetch('/state');
-    let data = await res.json();
-
-    let state = data.state;
-    let evals = data.evaluation;
-
-    let html = `
-    <b>Incident:</b> ${state.incident_type} <br>
-    <b>Status:</b> ${state.status} <br>
-    <b>Score:</b> ${state.score} <br>
-    <b>Steps:</b> ${state.step_count} <br><br>
-
-        <b>Logs:</b><br>
-        ${state.logs.map(l => "• " + l).join("<br>")}<br><br>
-
-        <b>Evaluation:</b><br>
-        ${evals.map(e => 
-            (e.passed ? "✅" : "❌") + " " + e.task
-        ).join("<br>")}
-    `;
-
-    document.getElementById('output').innerHTML = html;
-}
-</script>
-
-        </body>
-    </html>
-    """
-
-
