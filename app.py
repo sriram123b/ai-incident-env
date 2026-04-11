@@ -171,10 +171,9 @@ def evaluate_tasks(state):
 @app.get("/state")
 def get_state():
     return {
-        "state": state,
+        "observation": state,
         "evaluation": evaluate_tasks(state)
     }
-
 # ---------------- AUTOPLAY ----------------
 
 @app.post("/autoplay")
