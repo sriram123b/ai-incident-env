@@ -45,26 +45,23 @@ INCIDENTS = [
 
 # ---------------- GRADER ----------------
 def evaluate_tasks(state):
-    history = state.get("history", [])
-    resolved = state.get("resolved", False)
-    step_count = state.get("step_count", 0)
-
-    # Task 1 (must be >0 and <1)
-    task1 = 0.6 if resolved else 0.4
-
-    # Task 2 (efficiency)
-    if resolved:
-        task2 = 0.9 if step_count <= 3 else 0.7 if step_count <= 5 else 0.5
-    else:
-        task2 = 0.3
-
-    # Task 3 (sequence correctness)
-    task3 = 0.8 if ("investigate" in history and resolved) else 0.2
+    history = state.get("history") or []
+    resolved = state.get("resolved") or False
+    step_count = state.get("step_count") or 0
 
     return [
-        {"task": "basic_resolution", "score": task1},
-        {"task": "efficient_resolution", "score": task2},
-        {"task": "correct_sequence", "score": task3}
+        {
+            "task": "basic_resolution",
+            "score": 0.6 if resolved else 0.4
+        },
+        {
+            "task": "efficient_resolution",
+            "score": 0.9 if resolved and step_count <= 3 else 0.5
+        },
+        {
+            "task": "correct_sequence",
+            "score": 0.8 if ("investigate" in history and resolved) else 0.3
+        }
     ]
 # ---------------- STATE ----------------
 
@@ -163,19 +160,16 @@ def step(action: Action):
 
 @app.get("/state")
 def get_state():
-    return {
-
-        "observation": state,
-        "evaluation": evaluate_tasks(state)
-=======
-        "state": env.state(),
-        "evaluation": [
-            {"task": "easy_resolution", "score": 0.5},
-            {"task": "efficient_resolution", "score": 0.6},
-            {"task": "correct_sequence", "score": 0.7}
-        ]
-
-    }
+    try:
+        return {
+            "observation": state,
+            "evaluation": evaluate_tasks(state)
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "observation": state
+        }
 # ---------------- AUTOPLAY ----------------
 
 @app.post("/autoplay")
