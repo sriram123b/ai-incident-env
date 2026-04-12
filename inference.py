@@ -1,5 +1,11 @@
 import os
 import requests
+from openai import OpenAI 
+
+client = OpenAI(
+    base_url=os.environ["API_BASE_URL"],
+    api_key=os.environ["API_KEY"]
+) 
 
 # IMPORTANT: use injected env vars
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://127.0.0.1:8000")
@@ -30,30 +36,26 @@ def log_end(success, steps, score, rewards):
     )
 
 
+from openai import OpenAI
+
+client = OpenAI(
+    base_url=os.environ["API_BASE_URL"],
+    api_key=os.environ["API_KEY"]
+)
+
 def call_llm(obs):
-    """
-    Minimal LLM call through proxy (REQUIRED by validator)
-    """
     try:
-        headers = {
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json",
-        }
-
-        payload = {
-            "model": MODEL_NAME,
-            "messages": [
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
                 {"role": "system", "content": "Choose: investigate or resolve"},
-                {"role": "user", "content": str(obs)},
+                {"role": "user", "content": str(obs)}
             ],
-            "max_tokens": 5,
-        }
+            max_tokens=5,
+            temperature=0
+        )
 
-        # IMPORTANT: use API_BASE_URL
-        res = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
-
-        data = res.json()
-        text = data["choices"][0]["message"]["content"].strip().lower()
+        text = response.choices[0].message.content.strip().lower()
 
         if text not in ["investigate", "resolve"]:
             return "investigate"
@@ -61,7 +63,7 @@ def call_llm(obs):
         return text
 
     except Exception:
-        # fallback (DON'T CRASH)
+        # fallback (VERY IMPORTANT → prevents crash)
         return "investigate"
 
 
