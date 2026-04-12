@@ -2,18 +2,16 @@
 name = "incident-env"
 version = "0.1.0"
 description = "Incident response OpenEnv environment"
-<<<<<<< HEAD
+
 authors = [
     {name = "Sriram"},
     {name = "Vishala"}
 ]
-=======
->>>>>>> 7ac1055 (add uv.lock final)
+
 dependencies = [
     "fastapi",
     "uvicorn",
     "pydantic",
-<<<<<<< HEAD
     "requests",
     "openai"
 ]
@@ -21,10 +19,6 @@ dependencies = [
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
-=======
-    "openenv-core>=0.2.0"
-]
 
 [project.scripts]
-server = "server.app:app"
->>>>>>> 7ac1055 (add uv.lock final)
+server = "server.app:main"
