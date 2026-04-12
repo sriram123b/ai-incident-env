@@ -86,43 +86,47 @@ def step(action: Action):
     global state
 
     state["step_count"] += 1
-    reward = 0
+    reward = 0.0
 
-    # Ensure keys exist
     if "history" not in state:
         state["history"] = []
     if "resolved" not in state:
         state["resolved"] = False
+    if "logs" not in state:
+        state["logs"] = []
 
     state["history"].append(action.action)
 
+    # ---------------- INVESTIGATE ----------------
     if action.action == "investigate":
         state["status"] = "investigating"
-        state["logs"].append(f"Investigating {state['incident_type']}")
-        reward += 0.2
+        state["logs"].append("Investigation started")
+        reward += 0.3
 
+    # ---------------- RESOLVE ----------------
     elif action.action == "resolve":
         if "investigate" not in state["history"]:
             state["logs"].append("Resolve failed: investigate first")
             reward -= 0.3
         else:
             state["status"] = "resolved"
-            state["logs"].append("Resolved successfully")
+            state["logs"].append("Incident resolved successfully")
             state["resolved"] = True
-            reward += 0.6
+            reward += 0.7
 
+    # ---------------- UNKNOWN ----------------
     else:
         state["logs"].append(f"Unknown action: {action.action}")
         reward -= 0.2
 
-    # Penalties
+    # ---------------- PENALTIES ----------------
     if len(state["history"]) >= 2 and state["history"][-1] == state["history"][-2]:
         reward -= 0.2
 
     if state["step_count"] > 5:
         reward -= 0.3
 
-    done = state["status"] == "resolved"
+    done = state["resolved"]
 
     return {
         "observation": state,
@@ -134,37 +138,25 @@ def step(action: Action):
 # ---------------- GRADER ----------------
 
 def evaluate_tasks(state):
-    results = []
+    logs = state.logs
 
-    results.append({
-        "task": "easy_resolution",
-        "score": 1.0 if state.get("resolved") else 0.0
-    })
-
-    if state.get("resolved"):
-        if state["step_count"] <= 3:
-            score = 1.0
-        elif state["step_count"] <= 5:
-            score = 0.5
-        else:
-            score = 0.2
-    else:
-        score = 0.0
-
-    results.append({
-        "task": "efficient_resolution",
-        "score": score
-    })
-
-    results.append({
-        "task": "correct_sequence",
-        "score": 1.0 if (
-            "investigate" in state.get("history", []) and
-            state.get("resolved")
-        ) else 0.0
-    })
-
-    return results
+    return [
+        {
+            "task": "easy_resolution",
+            "score": 1.0 if len(logs) >= 2 else 0.0
+        },
+        {
+            "task": "efficient_resolution",
+            "score": 1.0 if state.resolved and state.step_count <= 3 else 0.5 if state.resolved else 0.0
+        },
+        {
+            "task": "correct_sequence",
+            "score": 1.0 if (
+                "Investigation started" in logs and
+                "resolved" in str(state.status).lower()
+            ) else 0.0
+        }
+    ]
 
 # ---------------- STATE ----------------
 
