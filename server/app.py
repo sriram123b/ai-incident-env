@@ -45,49 +45,27 @@ INCIDENTS = [
 
 # ---------------- GRADER ----------------
 def evaluate_tasks(state):
-    try:
-        history = state.get("history", [])
-        resolved = state.get("resolved", False)
-        step_count = state.get("step_count", 0)
+    history = state.get("history", [])
+    resolved = state.get("resolved", False)
+    step_count = state.get("step_count", 0)
 
-        results = []
+    # Task 1 (must be >0 and <1)
+    task1 = 0.6 if resolved else 0.4
 
-        # Task 1
-        results.append({
-            "task": "basic_resolution",
-            "score": 0.9 if resolved else 0.1
-        })
+    # Task 2 (efficiency)
+    if resolved:
+        task2 = 0.9 if step_count <= 3 else 0.7 if step_count <= 5 else 0.5
+    else:
+        task2 = 0.3
 
-        # Task 2 (smooth reward)
-        if resolved:
-            if step_count <= 3:
-                score = 0.95
-            elif step_count <= 5:
-                score = 0.6
-            else:
-                score = 0.3
-        else:
-            score = 0.2
+    # Task 3 (sequence correctness)
+    task3 = 0.8 if ("investigate" in history and resolved) else 0.2
 
-        results.append({
-            "task": "efficient_resolution",
-            "score": score
-        })
-
-        # Task 3
-        results.append({
-            "task": "correct_sequence",
-            "score": 0.85 if ("investigate" in history and resolved) else 0.2
-        })
-
-        return results
-
-    except Exception as e:
-        return [
-            {"task": "basic_resolution", "score": 0.1},
-            {"task": "efficient_resolution", "score": 0.1},
-            {"task": "correct_sequence", "score": 0.1}
-        ]
+    return [
+        {"task": "basic_resolution", "score": task1},
+        {"task": "efficient_resolution", "score": task2},
+        {"task": "correct_sequence", "score": task3}
+    ]
 # ---------------- STATE ----------------
 
 state = {
@@ -186,7 +164,7 @@ def step(action: Action):
 @app.get("/state")
 def get_state():
     return {
-<<<<<<< HEAD
+
         "observation": state,
         "evaluation": evaluate_tasks(state)
 =======
@@ -196,7 +174,7 @@ def get_state():
             {"task": "efficient_resolution", "score": 0.6},
             {"task": "correct_sequence", "score": 0.7}
         ]
->>>>>>> dc34428 (final fix: correct evaluation scores)
+
     }
 # ---------------- AUTOPLAY ----------------
 
