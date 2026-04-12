@@ -1,21 +1,16 @@
 import os
 import requests
-from openai import OpenAI
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 MODEL_NAME = os.getenv("MODEL_NAME", "baseline-agent")
-HF_TOKEN = os.getenv("HF_TOKEN", "dummy")
-
-client = OpenAI(
-    base_url=os.getenv("API_BASE_URL", "https://api.openai.com/v1"),
-    api_key=HF_TOKEN
-)
 
 TASK_NAME = "incident_response"
 BENCHMARK = "incident_env"
 
+
 def log_start():
     print(f"[START] task={TASK_NAME} env={BENCHMARK} model={MODEL_NAME}", flush=True)
+
 
 def log_step(step, action, reward, done, error=None):
     error_val = error if error else "null"
@@ -24,12 +19,14 @@ def log_step(step, action, reward, done, error=None):
         flush=True
     )
 
+
 def log_end(success, steps, score, rewards):
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
     print(
         f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}",
         flush=True
     )
+
 
 def main():
     rewards = []
@@ -42,32 +39,10 @@ def main():
     try:
         # RESET
         res = requests.post(f"{API_BASE_URL}/reset")
-        obs = res.json()["observation"]
+        obs = res.json().get("observation", {})
 
-        actions = []
-
-        # Generate actions using OpenAI
-        for _ in range(2):
-            try:
-                response = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[
-                        {"role": "system", "content": "You are an incident response agent. Choose either investigate or resolve."},
-                        {"role": "user", "content": str(obs)}
-                    ],
-                    max_tokens=10,
-                    temperature=0
-                )
-
-                act = response.choices[0].message.content.strip().lower()
-
-                if act not in ["investigate", "resolve"]:
-                    act = "investigate"
-
-            except Exception:
-                act = "investigate"
-
-            actions.append(act)
+        # SIMPLE RULE-BASED AGENT (no OpenAI)
+        actions = ["investigate", "resolve"]
 
         # EXECUTE ACTIONS
         for i, action in enumerate(actions, start=1):
@@ -82,7 +57,6 @@ def main():
 
             log_step(i, action, reward, done)
 
-            # update observation
             obs = data.get("observation", obs)
 
             if done:
@@ -90,7 +64,12 @@ def main():
 
         # FINAL STATE
         state = requests.get(f"{API_BASE_URL}/state").json()
-        score = state["evaluation"][0]["score"]
+
+        # SAFE ACCESS (avoid crash)
+        if "evaluation" in state and len(state["evaluation"]) > 0:
+            score = state["evaluation"][0].get("score", 0.0)
+        else:
+            score = 0.0
 
         success = score >= 1.0
 
@@ -100,6 +79,7 @@ def main():
 
     finally:
         log_end(success, steps, score, rewards)
+
 
 if __name__ == "__main__":
     main()
