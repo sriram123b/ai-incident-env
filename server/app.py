@@ -44,27 +44,39 @@ INCIDENTS = [
 ]
 
 # ---------------- GRADER ----------------
-
 def evaluate_tasks(state):
-    logs = state.logs
+    results = []
 
-    return [
-        {
-            "task": "easy_resolution",
-            "score": 1.0 if len(logs) >= 2 else 0.0
-        },
-        {
-            "task": "efficient_resolution",
-            "score": 1.0 if state.resolved and state.step_count <= 3 else 0.5 if state.resolved else 0.0
-        },
-        {
-            "task": "correct_sequence",
-            "score": 1.0 if (
-                "Investigation started" in logs and
-                "resolved" in str(state.status).lower()
-            ) else 0.0
-        }
-    ]
+    # Task 1
+    results.append({
+        "task": "basic_resolution",
+        "score": 0.9 if state.get("resolved") else 0.1
+    })
+
+    # Task 2
+    if state.get("resolved"):
+        if state["step_count"] <= 3:
+            score = 0.95
+        elif state["step_count"] <= 5:
+            score = 0.6
+        else:
+            score = 0.3
+    else:
+        score = 0.2
+
+    results.append({
+        "task": "efficient_resolution",
+        "score": score
+    })
+
+    # Task 3
+    history = state.get("history", [])
+    results.append({
+        "task": "correct_sequence",
+        "score": 0.85 if ("investigate" in history and state.get("resolved")) else 0.2
+    })
+
+    return results
 
 # ---------------- STATE ----------------
 
