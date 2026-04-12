@@ -43,6 +43,29 @@ INCIDENTS = [
     "Server down!!! urgent",
 ]
 
+# ---------------- GRADER ----------------
+
+def evaluate_tasks(state):
+    logs = state.logs
+
+    return [
+        {
+            "task": "easy_resolution",
+            "score": 1.0 if len(logs) >= 2 else 0.0
+        },
+        {
+            "task": "efficient_resolution",
+            "score": 1.0 if state.resolved and state.step_count <= 3 else 0.5 if state.resolved else 0.0
+        },
+        {
+            "task": "correct_sequence",
+            "score": 1.0 if (
+                "Investigation started" in logs and
+                "resolved" in str(state.status).lower()
+            ) else 0.0
+        }
+    ]
+
 # ---------------- STATE ----------------
 
 state = {
@@ -135,28 +158,6 @@ def step(action: Action):
         "info": {}
     }
 
-# ---------------- GRADER ----------------
-
-def evaluate_tasks(state):
-    logs = state.logs
-
-    return [
-        {
-            "task": "easy_resolution",
-            "score": 1.0 if len(logs) >= 2 else 0.0
-        },
-        {
-            "task": "efficient_resolution",
-            "score": 1.0 if state.resolved and state.step_count <= 3 else 0.5 if state.resolved else 0.0
-        },
-        {
-            "task": "correct_sequence",
-            "score": 1.0 if (
-                "Investigation started" in logs and
-                "resolved" in str(state.status).lower()
-            ) else 0.0
-        }
-    ]
 
 # ---------------- STATE ----------------
 
