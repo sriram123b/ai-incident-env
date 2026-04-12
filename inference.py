@@ -1,11 +1,16 @@
 import os
 import requests
-from openai import OpenAI 
+try:
+    from openai import OpenAI
+    USE_OPENAI = True
+except ImportError:
+    USE_OPENAI = False 
 
-client = OpenAI(
-    base_url=os.environ["API_BASE_URL"],
-    api_key=os.environ["API_KEY"]
-) 
+if USE_OPENAI:
+    client = OpenAI(
+        base_url=os.environ.get("API_BASE_URL"),
+        api_key=os.environ.get("API_KEY")
+    )
 
 # IMPORTANT: use injected env vars
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://127.0.0.1:8000")
@@ -44,27 +49,62 @@ client = OpenAI(
 )
 
 def call_llm(obs):
+    # TRY OpenAI client (if available)
+    if USE_OPENAI:
+        try:
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Choose: investigate or resolve"},
+                    {"role": "user", "content": str(obs)}
+                ],
+                max_tokens=5,
+            )
+
+            act = response.choices[0].message.content.strip().lower()
+
+            if act in ["investigate", "resolve"]:
+                return act
+
+        except Exception:
+            pass
+
+    # 🔥 FALLBACK → DIRECT PROXY CALL (NO CRASH)
     try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
+        import requests
+
+        headers = {
+            "Authorization": f"Bearer {os.environ.get('API_KEY')}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": "gpt-3.5-turbo",
+            "messages": [
                 {"role": "system", "content": "Choose: investigate or resolve"},
-                {"role": "user", "content": str(obs)}
+                {"role": "user", "content": str(obs)},
             ],
-            max_tokens=5,
-            temperature=0
+            "max_tokens": 5,
+        }
+
+        res = requests.post(
+            f"{os.environ.get('API_BASE_URL')}/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=5
         )
 
-        text = response.choices[0].message.content.strip().lower()
+        data = res.json()
+        text = data["choices"][0]["message"]["content"].strip().lower()
 
-        if text not in ["investigate", "resolve"]:
-            return "investigate"
-
-        return text
+        if text in ["investigate", "resolve"]:
+            return text
 
     except Exception:
-        # fallback (VERY IMPORTANT → prevents crash)
-        return "investigate"
+        pass
+
+    # FINAL fallback (never crash)
+    return "investigate"
 
 
 def main():
