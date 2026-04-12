@@ -1,10 +1,13 @@
 import os
 import requests
+
 try:
     from openai import OpenAI
     USE_OPENAI = True
 except ImportError:
     USE_OPENAI = False 
+
+client = None 
 
 if USE_OPENAI:
     client = OpenAI(
@@ -43,10 +46,7 @@ def log_end(success, steps, score, rewards):
 
 
 
-client = OpenAI(
-    base_url=os.environ["API_BASE_URL"],
-    api_key=os.environ["API_KEY"]
-)
+
 
 def call_llm(obs):
     # TRY OpenAI client (if available)
