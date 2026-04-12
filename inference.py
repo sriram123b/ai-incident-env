@@ -41,7 +41,7 @@ def log_end(success, steps, score, rewards):
     )
 
 
-from openai import OpenAI
+
 
 client = OpenAI(
     base_url=os.environ["API_BASE_URL"],
