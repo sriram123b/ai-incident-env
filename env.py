@@ -30,3 +30,10 @@ class Env:
 
     def state(self):
         return self.state_data 
+    
+    def evaluate(self):
+        return [
+            {"task": "easy_resolution", "score": 0.5},
+            {"task": "efficient_resolution", "score": 0.6},
+            {"task": "correct_sequence", "score": 0.7}
+        ]
