@@ -160,16 +160,10 @@ def step(action: Action):
 
 @app.get("/state")
 def get_state():
-    try:
-        return {
-            "observation": state,
-            "evaluation": evaluate_tasks(state)
-        }
-    except Exception as e:
-        return {
-            "error": str(e),
-            "observation": state
-        }
+    return {
+        "observation": state,
+        "evaluation": evaluate_tasks(state)
+    }
 # ---------------- AUTOPLAY ----------------
 
 @app.post("/autoplay")
