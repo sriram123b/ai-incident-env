@@ -45,39 +45,49 @@ INCIDENTS = [
 
 # ---------------- GRADER ----------------
 def evaluate_tasks(state):
-    results = []
+    try:
+        history = state.get("history", [])
+        resolved = state.get("resolved", False)
+        step_count = state.get("step_count", 0)
 
-    # Task 1
-    results.append({
-        "task": "basic_resolution",
-        "score": 0.9 if state.get("resolved") else 0.1
-    })
+        results = []
 
-    # Task 2
-    if state.get("resolved"):
-        if state["step_count"] <= 3:
-            score = 0.95
-        elif state["step_count"] <= 5:
-            score = 0.6
+        # Task 1
+        results.append({
+            "task": "basic_resolution",
+            "score": 0.9 if resolved else 0.1
+        })
+
+        # Task 2 (smooth reward)
+        if resolved:
+            if step_count <= 3:
+                score = 0.95
+            elif step_count <= 5:
+                score = 0.6
+            else:
+                score = 0.3
         else:
-            score = 0.3
-    else:
-        score = 0.2
+            score = 0.2
 
-    results.append({
-        "task": "efficient_resolution",
-        "score": score
-    })
+        results.append({
+            "task": "efficient_resolution",
+            "score": score
+        })
 
-    # Task 3
-    history = state.get("history", [])
-    results.append({
-        "task": "correct_sequence",
-        "score": 0.85 if ("investigate" in history and state.get("resolved")) else 0.2
-    })
+        # Task 3
+        results.append({
+            "task": "correct_sequence",
+            "score": 0.85 if ("investigate" in history and resolved) else 0.2
+        })
 
-    return results
+        return results
 
+    except Exception as e:
+        return [
+            {"task": "basic_resolution", "score": 0.1},
+            {"task": "efficient_resolution", "score": 0.1},
+            {"task": "correct_sequence", "score": 0.1}
+        ]
 # ---------------- STATE ----------------
 
 state = {
