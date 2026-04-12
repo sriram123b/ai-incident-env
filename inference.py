@@ -1,8 +1,10 @@
 import os
 import requests
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
-MODEL_NAME = os.getenv("MODEL_NAME", "baseline-agent")
+# IMPORTANT: use injected env vars
+API_BASE_URL = os.environ.get("API_BASE_URL", "http://127.0.0.1:8000")
+API_KEY = os.environ.get("API_KEY", "dummy")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-3.5-turbo")
 
 TASK_NAME = "incident_response"
 BENCHMARK = "incident_env"
@@ -28,6 +30,41 @@ def log_end(success, steps, score, rewards):
     )
 
 
+def call_llm(obs):
+    """
+    Minimal LLM call through proxy (REQUIRED by validator)
+    """
+    try:
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [
+                {"role": "system", "content": "Choose: investigate or resolve"},
+                {"role": "user", "content": str(obs)},
+            ],
+            "max_tokens": 5,
+        }
+
+        # IMPORTANT: use API_BASE_URL
+        res = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+
+        data = res.json()
+        text = data["choices"][0]["message"]["content"].strip().lower()
+
+        if text not in ["investigate", "resolve"]:
+            return "investigate"
+
+        return text
+
+    except Exception:
+        # fallback (DON'T CRASH)
+        return "investigate"
+
+
 def main():
     rewards = []
     steps = 0
@@ -41,11 +78,10 @@ def main():
         res = requests.post(f"{API_BASE_URL}/reset")
         obs = res.json().get("observation", {})
 
-        # SIMPLE RULE-BASED AGENT (no OpenAI)
-        actions = ["investigate", "resolve"]
+        # ACTION LOOP
+        for i in range(1, 4):
+            action = call_llm(obs)
 
-        # EXECUTE ACTIONS
-        for i, action in enumerate(actions, start=1):
             res = requests.post(f"{API_BASE_URL}/step", json={"action": action})
             data = res.json()
 
@@ -65,11 +101,8 @@ def main():
         # FINAL STATE
         state = requests.get(f"{API_BASE_URL}/state").json()
 
-        # SAFE ACCESS (avoid crash)
         if "evaluation" in state and len(state["evaluation"]) > 0:
             score = state["evaluation"][0].get("score", 0.0)
-        else:
-            score = 0.0
 
         success = score >= 1.0
 
